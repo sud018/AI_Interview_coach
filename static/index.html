@@ -1,0 +1,322 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AI Interviewer</title>
+<link rel="stylesheet" href="/static/style.css">
+<script src="https://cdn.jsdelivr.net/npm/marked@12.0.2/marked.min.js"></script>
+</head>
+<body>
+<header>
+  <h1>AI Interviewer</h1>
+  <nav id="nav" class="hidden">
+    <button data-view="questions">Questions</button>
+    <button data-view="shadow">Shadow practice</button>
+    <button data-view="history">History</button>
+    <button data-view="settings">Settings</button>
+  </nav>
+</header>
+
+<main>
+  <!-- ============ FIRST RUN: API KEY ============ -->
+  <section id="view-setup" class="view hidden">
+    <div class="card narrow">
+      <h2>Welcome</h2>
+      <p>Choose the AI that scores and coaches your answers, and paste its API key. Keys are saved only on this computer (in <code>data/settings.json</code>) and can be changed any time in Settings.</p>
+      <label>AI provider <select id="setup-provider"></select></label>
+      <label id="setup-base-wrap" class="hidden">Base URL <input id="setup-base" placeholder="https://your-server/v1"></label>
+      <label><span id="setup-key-label">OpenAI API key</span> <input id="setup-key" type="password" placeholder="sk-..."></label>
+      <label id="setup-model-wrap">AI model for scoring &amp; coaching (change later in Settings)
+        <select id="setup-model" class="model-select"></select>
+      </label>
+      <input id="setup-model-custom" class="hidden" placeholder="Type exact model name">
+      <label id="setup-openai-wrap" class="hidden">OpenAI API key for voice features (optional)
+        <input id="setup-openai-key" type="password" placeholder="sk-...">
+      </label>
+      <p id="setup-voice-hint" class="hint hidden">Speech-to-text, the natural read-aloud voice and "AI listens" use OpenAI speech models. Without an OpenAI key you can still type your answers and use the free browser voice (with Groq, speech-to-text works too).</p>
+      <label>Target role <input id="setup-role" placeholder="e.g. Senior Data Engineer"></label>
+      <label>Experience level to sound like (years) <input id="setup-years" placeholder="e.g. 5"></label>
+      <div class="row">
+        <button id="setup-save" class="primary">Test &amp; save</button>
+        <span id="setup-msg" class="msg"></span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ QUESTIONS ============ -->
+  <section id="view-questions" class="view hidden">
+    <div class="grid2">
+      <div class="card">
+        <h2>1. Add questions</h2>
+        <label>Upload Excel / CSV / PDF / Word / TXT
+          <input id="q-file" type="file" accept=".xlsx,.xlsm,.csv,.pdf,.docx,.txt,.md">
+        </label>
+        <label class="inline"><input id="q-ai" type="checkbox"> Use AI to extract questions (best for messy PDF/Word files)</label>
+        <p class="hint">Excel/CSV: a column named <b>Question</b> (optional <b>Answer</b> and <b>Category</b> columns). Otherwise the longest text column is used.</p>
+        <label>Or type / paste questions (one per line or numbered)
+          <textarea id="q-text" rows="6" placeholder="1. Tell me about yourself&#10;2. Explain how a hash map works&#10;3. Describe a production incident you handled"></textarea>
+        </label>
+        <div class="row">
+          <button id="q-add-text">Add typed questions</button>
+          <button id="q-add-one">+ Add empty question</button>
+          <button id="q-clear" class="danger">Clear list</button>
+        </div>
+        <span id="q-msg" class="msg"></span>
+      </div>
+
+      <div class="card">
+        <h2>2. Saved question sets</h2>
+        <div class="row">
+          <select id="set-select"><option value="">-- load a saved set --</option></select>
+          <button id="set-load">Load</button>
+          <button id="set-delete" class="danger">Delete</button>
+        </div>
+        <div class="row">
+          <input id="set-name" placeholder="Set name, e.g. Java backend round 1">
+          <button id="set-save">Save current list</button>
+        </div>
+        <h2>3. Start interview</h2>
+        <label>Interview name <input id="iv-name" placeholder="e.g. Mock round - Amazon SDE2"></label>
+        <label>Mode
+          <select id="iv-mode">
+            <option value="coach">Coach mode - feedback after every question (best for training)</option>
+            <option value="real">Real interview - questions back to back, feedback at the end</option>
+          </select>
+        </label>
+        <label>Job description (optional)
+          <textarea id="iv-jd" rows="5" placeholder="Paste the job description here. Scoring, model answers, technical terms and Learn lessons will be tailored to this job. Leave empty to use the one in Settings (if any)."></textarea>
+        </label>
+        <label class="inline"><input id="iv-shuffle" type="checkbox"> Shuffle questions</label>
+        <button id="iv-start" class="primary big">Start interview</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Question list <span id="q-count" class="pill">0</span></h2>
+      <p class="hint">Edit any question. Click <b>Learn</b> to get a full A-Z lesson on how to answer it like an experienced professional before you attempt it.</p>
+      <div id="q-list"></div>
+    </div>
+  </section>
+
+  <!-- ============ INTERVIEW ============ -->
+  <section id="view-interview" class="view hidden">
+    <div class="interview">
+      <div class="card">
+        <div class="row between">
+          <span id="iv-progress" class="pill"></span>
+          <span id="iv-timer" class="timer">00:00</span>
+        </div>
+        <div id="iv-category" class="hint"></div>
+        <h2 id="iv-question" class="question"></h2>
+        <div class="video-wrap">
+          <video id="iv-video" autoplay muted playsinline></video>
+          <div id="iv-rec" class="rec hidden">● REC</div>
+        </div>
+        <div id="iv-status" class="msg"></div>
+        <div class="row">
+          <button id="iv-repeat">🔊 Repeat question</button>
+          <button id="iv-record" class="primary">▶ Start answering</button>
+          <button id="iv-stop" class="danger hidden">■ Stop &amp; submit</button>
+          <button id="iv-skip">Skip</button>
+          <button id="iv-end">End interview</button>
+        </div>
+        <details>
+          <summary>No mic/camera? Type your answer instead</summary>
+          <textarea id="iv-typed" rows="5" placeholder="Type your answer..."></textarea>
+          <button id="iv-typed-submit">Submit typed answer</button>
+        </details>
+      </div>
+      <div class="card" id="iv-feedback-card">
+        <h2>Feedback</h2>
+        <div id="iv-feedback"><p class="hint">Answer the question. In coach mode your score and coaching appear here.</p></div>
+        <div class="row" id="iv-after" style="display:none">
+          <button id="iv-retry">↻ Retry this question</button>
+          <button id="iv-next" class="primary">Next question →</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ RESULTS / SESSION DETAIL ============ -->
+  <section id="view-results" class="view hidden">
+    <div class="card">
+      <div class="row between">
+        <h2 id="res-title">Results</h2>
+        <div class="row">
+          <button id="res-refresh">Refresh</button>
+          <button id="res-report" class="primary">Generate full training report</button>
+        </div>
+      </div>
+      <p id="res-sub" class="hint"></p>
+      <div id="res-report-box"></div>
+    </div>
+    <div id="res-questions"></div>
+  </section>
+
+  <!-- ============ SHADOW PRACTICE ============ -->
+  <section id="view-shadow" class="view hidden">
+    <div class="shadow-grid">
+      <div class="card sh-left">
+        <h2>Shadow practice</h2>
+        <p class="hint">Listen to a model answer phrase by phrase, repeat it out loud straight away, and get rated. Voice only.</p>
+        <div class="row">
+          <select id="sh-set"></select>
+          <button id="sh-new-btn">+ New set</button>
+        </div>
+        <div id="sh-new" class="hidden sh-newbox">
+          <label>Set name <input id="sh-new-name" placeholder="e.g. Data Engineer - Bank"></label>
+          <label>Questions file (PDF / Word / Excel / CSV / TXT) <input id="sh-new-qfile" type="file" accept=".pdf,.docx,.xlsx,.csv,.txt"></label>
+          <label>Or paste questions <textarea id="sh-new-qtext" rows="3"></textarea></label>
+          <label>Your resume (PDF / Word / TXT) <input id="sh-new-resume" type="file" accept=".pdf,.docx,.txt,.md"></label>
+          <label>Job description (optional) <textarea id="sh-new-jd" rows="3"></textarea></label>
+          <div class="row"><button id="sh-new-create" class="primary">Create set</button><button id="sh-set-delete" class="danger">Delete selected set</button></div>
+          <span id="sh-new-msg" class="msg"></span>
+        </div>
+        <div class="row">
+          <select id="sh-topic"><option value="">All topics</option></select>
+        </div>
+        <div class="row">
+          <label class="inline"><input id="sh-high" type="checkbox"> HIGH priority only</label>
+          <label class="inline"><input id="sh-ready" type="checkbox"> With answers only</label>
+        </div>
+        <input id="sh-search" placeholder="Search questions...">
+        <div class="row">
+          <button id="sh-gen-all">✨ Generate missing answers</button>
+          <span id="sh-gen-msg" class="msg"></span>
+        </div>
+        <div id="sh-list" class="sh-list"></div>
+      </div>
+
+      <div class="card sh-right">
+        <div class="sh-settings">
+          <label>Accent
+            <select id="sh-accent"><option value="american">🇺🇸 American</option><option value="indian">🇮🇳 Indian</option></select>
+          </label>
+          <label>Voice engine
+            <select id="sh-engine"><option value="openai">OpenAI natural voice (cached)</option><option value="browser">Browser voice (free)</option></select>
+          </label>
+          <label>Voice <select id="sh-voice"></select></label>
+          <label>Pace
+            <select id="sh-pace"><option value="normal">Normal</option><option value="slow">Slow &amp; clear</option></select>
+          </label>
+        </div>
+        <div class="row">
+          <label class="inline"><input id="sh-showtext" type="checkbox"> Show text while listening</label>
+          <label class="inline"><input id="sh-autonext" type="checkbox" checked> Auto-continue</label>
+          <label class="inline"><input id="sh-autoretry" type="checkbox" checked> Repeat phrases scoring under 70</label>
+          <label class="inline"><input id="sh-natural" type="checkbox" checked> Natural “thinking while speaking” voice</label>
+          <label class="inline" title="Records your microphone without echo cancellation / noise suppression, so your voice is never cut while the app's voice plays. Turn off only if you use speakers."><input id="sh-headphones" type="checkbox" checked> I'm using headphones (clean, uncut recording)</label>
+        </div>
+        <p class="hint sh-tip">💡 In real conversation, people pause unevenly. They take short breaths between words and longer pauses of 0.7 to 1.5 seconds when moving to a new idea, while thinking. Silence is usually 15–25% of the time. The voice now speaks this way; copy its pauses, not just its words.</p>
+        <p id="sh-voice-note" class="hint"></p>
+
+        <div id="sh-empty" class="hint">← Pick a question to start.</div>
+        <div id="sh-main" class="hidden">
+          <div class="hint" id="sh-qtopic"></div>
+          <h2 id="sh-qtext" class="question"></h2>
+          <div class="row">
+            <button id="sh-start" class="primary big-inline">▶ Speak along (whole answer)</button>
+            <button id="sh-phrases">🔁 Listen &amp; repeat phrase by phrase</button>
+            <button id="sh-stop" class="danger hidden">■ Stop</button>
+            <button id="sh-hearq">🔊 Hear question</button>
+            <button id="sh-listen">🎧 Listen to full answer</button>
+            <button id="sh-recall">🧠 Say it from memory</button>
+          </div>
+          <div class="row">
+            <button id="sh-edit">✏ Edit answer</button>
+            <button id="sh-generate">✨ (Re)generate answer from resume</button>
+            <span class="hint" id="sh-meta"></span>
+          </div>
+          <div id="sh-editbox" class="hidden">
+            <textarea id="sh-edittext" rows="8"></textarea>
+            <div class="row"><button id="sh-editsave" class="primary">Save answer</button><button id="sh-editcancel">Cancel</button></div>
+          </div>
+
+          <div id="sh-stage" class="sh-stage">
+            <div id="sh-status" class="sh-status">Ready</div>
+            <div class="sh-levelwrap"><div id="sh-level" class="sh-level"></div></div>
+            <div id="sh-progress" class="hint"></div>
+            <div id="sh-phrase" class="sh-phrase hidden"></div>
+            <button id="sh-done" class="hidden">I'm done speaking (Space)</button>
+            <button id="sh-next" class="primary hidden">Next phrase →</button>
+          </div>
+          <div id="sh-summary"></div>
+          <div id="sh-results"></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ HISTORY ============ -->
+  <section id="view-history" class="view hidden">
+    <div class="card">
+      <h2>Past interviews</h2>
+      <p class="hint">Recordings, transcripts, evaluations and reports are saved in the <code>sessions</code> folder next to the app.</p>
+      <div id="hist-list"></div>
+    </div>
+  </section>
+
+  <!-- ============ SETTINGS ============ -->
+  <section id="view-settings" class="view hidden">
+    <div class="grid2">
+      <div class="card">
+        <h2>AI for scoring &amp; coaching</h2>
+        <label>Provider <select id="s-llm_provider"></select></label>
+        <label id="s-base-wrap" class="hidden">Base URL <input id="s-llm_base_url" placeholder="https://your-server/v1"></label>
+        <label id="s-llmkey-wrap" class="hidden">API key <span id="set-llmkey-current" class="hint"></span>
+          <input id="s-llm-key" type="password" placeholder="Paste a new key to change it">
+        </label>
+        <label id="s-model-wrap">AI model
+          <select id="s-chat_model" class="model-select"></select>
+        </label>
+        <input id="s-chat_model-custom" class="hidden" placeholder="Type exact model name">
+        <div class="row"><button id="s-test-llm">Test</button><span id="s-test-llm-msg" class="msg"></span></div>
+        <p class="hint">If body-language analysis gives an error with your model, untick it below or pick a model that can read images (e.g. gpt-4o-mini). Models that can't see images are scored without the webcam frames.</p>
+        <h2>OpenAI (voice features)</h2>
+        <p class="hint">Used for speech-to-text, the natural read-aloud voice and "AI listens". If OpenAI is your provider above, it's the same key.</p>
+        <label>OpenAI API key <span id="set-key-current" class="hint"></span>
+          <input id="s-key" type="password" placeholder="Paste a new key to change it">
+        </label>
+        <div class="row"><button id="s-test">Test key</button><span id="s-test-msg" class="msg"></span></div>
+        <label>Speech-to-text model
+          <select id="s-transcribe_model">
+            <option value="gpt-4o-mini-transcribe">gpt-4o-mini-transcribe - recommended (~$0.003/min)</option>
+            <option value="gpt-4o-transcribe">gpt-4o-transcribe - more accurate (~$0.006/min)</option>
+            <option value="whisper-1">whisper-1 - old, shuts down Feb 2027</option>
+          </select>
+        </label>
+        <label>Audio model for "AI listens" (delivery analysis)
+          <input id="s-audio_model" list="audio-models" placeholder="gpt-audio-mini">
+          <datalist id="audio-models"><option value="gpt-audio-mini"><option value="gpt-audio"><option value="gpt-4o-audio-preview"><option value="gpt-4o-mini-audio-preview"></datalist>
+        </label>
+        <p class="hint">A model that can hear audio. gpt-audio-mini is cheapest (about 1-3 cents per analysis); gpt-audio is more detailed. If one isn't available to your key, the app tries the others automatically.</p>
+        <label class="inline"><input id="s-analyze_body_language" type="checkbox"> Analyze body language from webcam frames</label>
+        <label class="inline"><input id="s-speak_questions" type="checkbox"> Read questions aloud</label>
+        <label>Max answer time (seconds) <input id="s-answer_time_limit_sec" type="number" min="30" max="900"></label>
+      </div>
+      <div class="card">
+        <h2>Your profile (used to tailor coaching)</h2>
+        <label>Name <input id="s-candidate_name"></label>
+        <label>Target role <input id="s-target_role"></label>
+        <label>Experience level to sound like (years) <input id="s-experience_years"></label>
+        <label>Tech stack / domain <input id="s-tech_stack" placeholder="e.g. Python, AWS, Spark, Kafka"></label>
+        <label>Job description (optional) <textarea id="s-job_description" rows="6"></textarea></label>
+      </div>
+    </div>
+    <div class="row"><button id="s-save" class="primary">Save settings</button><span id="s-msg" class="msg"></span></div>
+  </section>
+</main>
+
+<!-- modal for lessons -->
+<div id="modal" class="modal hidden">
+  <div class="modal-box">
+    <div class="row between"><h2 id="modal-title"></h2><button id="modal-close">✕</button></div>
+    <div id="modal-body" class="md"></div>
+  </div>
+</div>
+
+<script src="/static/app.js"></script>
+<script src="/static/shadow.js"></script>
+</body>
+</html>

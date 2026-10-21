@@ -1,0 +1,80 @@
+{
+  "id": "sample_common_questions",
+  "name": "Sample: common interview questions",
+  "resume_text": "",
+  "job_description": "",
+  "items": [
+    {
+      "id": 1,
+      "n": 1,
+      "topic": "Introduction",
+      "high": true,
+      "question": "Tell me about yourself.",
+      "answer": "Sure. I'm a software engineer with about five years of experience, mostly on backend services and the APIs that sit behind customer-facing products. Right now I spend most of my time designing services, reviewing code, and working with product to turn vague requirements into something we can actually ship. The part I enjoy most is taking a messy problem and making it simple and reliable. For example, in my last project our order service kept timing out under load. I traced it to a chatty database pattern, redesigned the queries and added caching, and the timeouts basically went away. I'm looking for a role where I can own bigger pieces of the system and keep growing as a technical lead. That's what drew me to this position."
+    },
+    {
+      "id": 2,
+      "n": 2,
+      "topic": "Behavioral",
+      "high": true,
+      "question": "Tell me about a time you disagreed with a teammate.",
+      "answer": "Sure. On one project, a teammate wanted to add a new message queue to fix a slow reporting job. I thought it was too much infrastructure for the problem. So first, I asked him to walk me through the numbers, because I wanted to understand his reasoning, not just argue. It turned out the real issue was one unindexed query. We agreed to try the simple fix first, with a clear rule: if it didn't hit our latency target in a week, we'd go with his design. The index alone cut the job from forty minutes to under three. What I learned is that disagreements go better when you make them about data and a shared goal. And honestly, he was right that we'd need a queue later, so we planned for it."
+    },
+    {
+      "id": 3,
+      "n": 3,
+      "topic": "Behavioral",
+      "high": true,
+      "question": "Describe a project that failed and what you learned.",
+      "answer": "One that comes to mind is a migration I led to move our reporting to a new data platform. We planned it as one big cutover. The problem was we underestimated how many teams depended on the old reports, and in the first week a few dashboards showed wrong numbers. That hurt trust. So we rolled back, and I changed the approach. We ran both systems side by side, compared outputs automatically every night, and moved one team at a time. The second attempt took longer, but it went smoothly. What I learned is to treat migrations as a series of small, reversible steps, and to find your hidden consumers before you change anything. I now start every migration with a dependency inventory."
+    },
+    {
+      "id": 4,
+      "n": 4,
+      "topic": "Technical",
+      "high": true,
+      "question": "How do you design a system to handle high traffic?",
+      "answer": "The way I approach it is to start with the numbers. First, I want to know the expected requests per second, the read to write ratio, and the latency target. That tells me where the real pressure is. Then I keep the application tier stateless, so I can scale it horizontally behind a load balancer. For reads, I add caching close to the user, and for writes I look at partitioning the data and using queues to smooth out spikes. The key thing is to protect the system from itself, so I add rate limiting, timeouts, and circuit breakers between services. And finally, I make it observable. Good metrics and alerts tell you where the next bottleneck is before your users do. The trade-off is complexity, so I only add pieces when the numbers justify them."
+    },
+    {
+      "id": 5,
+      "n": 5,
+      "topic": "Technical",
+      "high": true,
+      "question": "What happens when you type a URL into a browser and press enter?",
+      "answer": "So first, the browser figures out where to go. It parses the URL, checks its cache, and if needed does a DNS lookup to turn the domain into an IP address. Then it opens a TCP connection, and for HTTPS it does a TLS handshake to agree on encryption and verify the server's certificate. Next it sends the HTTP request, usually through a CDN or load balancer, which routes it to an application server. The server does its work, maybe hits a cache or a database, and sends back a response. Then the browser parses the HTML, fetches CSS, JavaScript and images, builds the page and renders it. In practice, most of the speed wins come from caching, CDNs, and cutting down how much the browser has to download."
+    },
+    {
+      "id": 6,
+      "n": 6,
+      "topic": "Closing",
+      "high": true,
+      "question": "Why should we hire you?",
+      "answer": "I think I'd add value in three ways. First, I can work across the stack, so I'm comfortable taking a feature from the database all the way to the user and making it production-ready. Second, I care about reliability. I write tests, add monitoring, and I'm the person who digs into the incident until we understand the root cause. And third, I communicate well with non-engineers. A lot of my work has been turning unclear requirements into a clear plan, and keeping stakeholders in the loop. From what I've read about this role, you need someone who can own features end to end and raise the quality bar for the team. That's exactly the kind of work I enjoy, and I'd be excited to do it here."
+    },
+    {
+      "id": 7,
+      "n": 7,
+      "topic": "Behavioral",
+      "high": false,
+      "question": "Tell me about a time you had to learn something quickly.",
+      "answer": ""
+    },
+    {
+      "id": 8,
+      "n": 8,
+      "topic": "Technical",
+      "high": false,
+      "question": "Explain the difference between SQL and NoSQL databases and when you'd use each.",
+      "answer": ""
+    },
+    {
+      "id": 9,
+      "n": 9,
+      "topic": "Closing",
+      "high": false,
+      "question": "What questions do you have for us?",
+      "answer": ""
+    }
+  ]
+}

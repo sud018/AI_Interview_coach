@@ -1,0 +1,18 @@
+# Python
+.venv/
+venv/
+__pycache__/
+*.pyc
+
+# Personal data created by the app - never commit
+data/
+sessions/
+shadow_recordings/
+personal/
+*.tmp
+.env
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
