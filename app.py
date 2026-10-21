@@ -22,7 +22,8 @@ DATA_DIR = os.path.join(BASE_DIR, "data")
 SESSIONS_DIR = os.path.join(BASE_DIR, "sessions")
 QUESTION_SETS_DIR = os.path.join(DATA_DIR, "question_sets")
 SETTINGS_FILE = os.path.join(DATA_DIR, "settings.json")
-for d in (DATA_DIR, SESSIONS_DIR, QUESTION_SETS_DIR):
+RESUMES_DIR = os.path.join(BASE_DIR, "resumes")  # one subfolder per uploaded resume: original file + resume.txt
+for d in (DATA_DIR, SESSIONS_DIR, QUESTION_SETS_DIR, RESUMES_DIR):
     os.makedirs(d, exist_ok=True)
 
 app = Flask(__name__, static_folder="static", static_url_path="/static")
@@ -47,6 +48,7 @@ DEFAULT_SETTINGS = {
     "llm_provider": "openai",
     "llm_api_key": "",
     "llm_base_url": "",
+    "active_resume_id": "",
 }
 
 
@@ -198,6 +200,12 @@ def profile_text(s, jd=None):
         lines.append(f"Tech stack / domain: {s['tech_stack']}")
     if jd:
         lines.append("Job description (tailor expectations, vocabulary and examples to this):\n" + jd[:6000])
+    resume = active_resume_text(s)
+    if resume:
+        lines.append("Candidate's resume (their REAL experience. Base model answers and examples on it; never invent "
+                     "employers, projects, numbers or metrics that are not in it):\n" + resume[:10000])
+    else:
+        lines.append("No resume provided: keep experience examples generic and don't invent specific employers or metrics.")
     return "\n".join(lines)
 
 
@@ -589,6 +597,199 @@ def learn():
         return jsonify({"markdown": chat_text(LEARN_SYSTEM, user, max_tokens=5000)})
     except Exception as e:
         return jsonify({"error": str(e)}), 400
+
+
+# ---------------------------------------------------------- routes: resumes
+RESUME_EXTS = (".pdf", ".docx", ".txt", ".md")
+
+
+def resume_meta(rid):
+    return read_json(os.path.join(RESUMES_DIR, slug(rid, 120), "meta.json"))
+
+
+def list_resumes():
+    out = []
+    for rid in sorted(os.listdir(RESUMES_DIR), reverse=True):
+        m = resume_meta(rid)
+        if m:
+            out.append(m)
+    return out
+
+
+def resume_text(rid):
+    try:
+        with open(os.path.join(RESUMES_DIR, slug(rid, 120), "resume.txt"), encoding="utf-8") as fh:
+            return fh.read()
+    except Exception:
+        return ""
+
+
+def active_resume_text(s=None):
+    rid = (s or load_settings()).get("active_resume_id")
+    return resume_text(rid) if rid else ""
+
+
+def save_resume(name, filename, data, text):
+    """Store an uploaded resume in resumes/<id>/ and return its metadata."""
+    text = re.sub(r"[ \t]+", " ", text or "").strip()
+    if len(text) < 80:
+        raise ValueError("Couldn't read enough text from this resume (scanned image PDF?). Paste the text instead.")
+    base = datetime.now().strftime("%Y%m%d_%H%M%S") + "_" + slug(name, 40)
+    rid, n = base, 2
+    while os.path.exists(os.path.join(RESUMES_DIR, rid)):
+        rid, n = f"{base}_{n}", n + 1
+    folder = os.path.join(RESUMES_DIR, rid)
+    os.makedirs(folder, exist_ok=True)
+    if data and filename:
+        safe = re.sub(r"[^A-Za-z0-9._ -]+", "_", os.path.basename(filename))[:120] or "resume"
+        with open(os.path.join(folder, safe), "wb") as fh:
+            fh.write(data)
+    else:
+        safe = ""
+    with open(os.path.join(folder, "resume.txt"), "w", encoding="utf-8") as fh:
+        fh.write(text)
+    meta = {"id": rid, "name": name, "filename": safe, "uploaded": datetime.now().isoformat(timespec="seconds"),
+            "chars": len(text), "preview": text[:220]}
+    write_json(os.path.join(folder, "meta.json"), meta)
+    return meta
+
+
+def set_active_resume(rid):
+    s = load_settings()
+    s["active_resume_id"] = rid or ""
+    save_settings(s)
+
+
+def resumes_payload():
+    s = load_settings()
+    items = list_resumes()
+    active = s.get("active_resume_id") if any(r["id"] == s.get("active_resume_id") for r in items) else ""
+    return {"active": active, "resumes": items}
+
+
+@app.get("/api/resumes")
+def get_resumes():
+    return jsonify(resumes_payload())
+
+
+@app.post("/api/resumes")
+def upload_resume():
+    """multipart: file (pdf/docx/txt/md) and/or text, name, make_active (default 1)."""
+    f = request.files.get("file")
+    data, filename, text = None, "", (request.form.get("text") or "").strip()
+    if f and f.filename:
+        filename = f.filename
+        if not filename.lower().endswith(RESUME_EXTS):
+            return jsonify({"error": "Upload a PDF, Word (.docx) or text file."}), 400
+        data = f.read()
+        f.stream.seek(0)
+        try:
+            text = read_file_text(f) + ("\n" + text if text else "")
+        except Exception as e:
+            return jsonify({"error": f"Could not read the file: {e}"}), 400
+    if not text:
+        return jsonify({"error": "Choose a resume file or paste the resume text."}), 400
+    name = (request.form.get("name") or "").strip() or (os.path.splitext(filename)[0] if filename else "My resume")
+    try:
+        meta = save_resume(name, filename, data, text)
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
+    if request.form.get("make_active", "1") == "1":
+        set_active_resume(meta["id"])
+    return jsonify(resumes_payload())
+
+
+@app.post("/api/resumes/active")
+def activate_resume():
+    rid = (request.get_json(force=True) or {}).get("id") or ""
+    if rid and not resume_meta(rid):
+        return jsonify({"error": "not found"}), 404
+    set_active_resume(rid)
+    return jsonify(resumes_payload())
+
+
+@app.get("/api/resumes/<rid>/text")
+def get_resume_text(rid):
+    m = resume_meta(rid)
+    return jsonify({**m, "text": resume_text(rid)}) if m else (jsonify({"error": "not found"}), 404)
+
+
+@app.route("/resumes/<rid>/file")
+def resume_file(rid):
+    m = resume_meta(rid)
+    if not m or not m.get("filename"):
+        abort(404)
+    return send_from_directory(os.path.join(RESUMES_DIR, m["id"]), m["filename"], as_attachment=True)
+
+
+@app.delete("/api/resumes/<rid>")
+def delete_resume(rid):
+    import shutil
+    m = resume_meta(rid)
+    if m:
+        shutil.rmtree(os.path.join(RESUMES_DIR, m["id"]), ignore_errors=True)
+        if load_settings().get("active_resume_id") == m["id"]:
+            set_active_resume("")
+    return jsonify(resumes_payload())
+
+
+RESUME_QUESTIONS_SYSTEM = """You are a senior interviewer preparing a realistic interview for ONE specific candidate.
+Read their resume (and the job description, if given) and write the questions a real interviewer would ask THIS person:
+deep-dives into their actual projects, technologies and decisions, the impact they claim, gaps or short stints worth probing,
+plus core technical and behavioral questions for the target role. Never ask about things that aren't in the resume as if
+the candidate did them.
+Focus: {focus}
+Return ONLY JSON: {{"questions":[{{"question":"...","category":"Introduction | Project deep-dive | Technical | System design | Behavioral | Role fit","answer":"..."}}]}}
+{answers}"""
+
+RESUME_ANSWER_RULES = """For "answer": write what the candidate would SAY, first person, as an experienced professional:
+- Use ONLY experience, companies, projects and skills that appear in the resume. Never invent employers, numbers,
+  percentages, team sizes or metrics. If the resume doesn't show the experience, answer from solid technical knowledge
+  ("The way I'd approach it is...") without claiming fake experience.
+- Natural spoken English: short sentences, contractions, clear signposting, no bullet points or markdown.
+- 120-170 words. Behavioral questions: STAR structure in natural speech."""
+
+FOCUS = {
+    "mixed": "a balanced mix - introduction, project deep-dives, technical, behavioral and role fit",
+    "projects": "mostly deep-dives into the specific projects and work on the resume",
+    "technical": "mostly technical questions on the skills and technologies on the resume",
+    "behavioral": "mostly behavioral questions (STAR) built around situations from the resume",
+}
+
+
+def questions_from_resume(resume, count=10, focus="mixed", with_answers=True, jd=""):
+    s = load_settings()
+    count = max(3, min(int(count or 10), 30))
+    system = RESUME_QUESTIONS_SYSTEM.format(
+        focus=FOCUS.get(focus, FOCUS["mixed"]),
+        answers=RESUME_ANSWER_RULES if with_answers else 'Set "answer" to an empty string.')
+    jd = (jd or "").strip() or (s.get("job_description") or "").strip()
+    user = (f"Write exactly {count} questions.\nTarget role: {s.get('target_role') or 'not specified'}\n"
+            f"Experience level: {s.get('experience_years') or 'not specified'} years\n"
+            f"Job description: {jd[:5000] or 'not provided'}\n\nResume:\n{resume[:12000]}")
+    res = chat_json(system, user, max_tokens=1500 + count * (450 if with_answers else 60))
+    out = []
+    for q in res.get("questions", []):
+        if (q.get("question") or "").strip():
+            out.append({"question": q["question"].strip(), "category": q.get("category", ""),
+                        "reference_answer": (q.get("answer") or "").strip() if with_answers else ""})
+    return out
+
+
+@app.post("/api/resumes/questions")
+def resume_questions():
+    b = request.get_json(force=True) or {}
+    resume = active_resume_text()
+    if not resume:
+        return jsonify({"error": "No active resume. Upload one in the Resumes tab and make it active."}), 400
+    try:
+        qs = questions_from_resume(resume, b.get("count", 10), b.get("focus", "mixed"),
+                                   b.get("with_answers", True), b.get("job_description", ""))
+    except Exception as e:
+        return jsonify({"error": str(e)}), 400
+    if not qs:
+        return jsonify({"error": "The AI model didn't return any questions. Try again or pick another model."}), 400
+    return jsonify({"questions": qs})
 
 
 # --------------------------------------------------------- routes: sessions
@@ -1060,12 +1261,27 @@ def shadow_create():
             qs = split_questions_from_text(text)
     if request.form.get("questions_text"):
         qs += split_questions_from_text(request.form["questions_text"])
+    # a resume uploaded here is saved to the Resumes library and becomes the active one
+    rf = request.files.get("resume_file")
+    if rf and rf.filename:
+        data = rf.read()
+        rf.stream.seek(0)
+        try:
+            meta = save_resume(os.path.splitext(rf.filename)[0], rf.filename, data, read_file_text(rf))
+        except Exception as e:
+            return jsonify({"error": f"Resume: {e}"}), 400
+        set_active_resume(meta["id"])
+    resume = active_resume_text()
+    if request.form.get("from_resume") == "1":
+        if not resume:
+            return jsonify({"error": "No active resume. Upload one here or in the Resumes tab."}), 400
+        try:
+            qs += questions_from_resume(resume, request.form.get("count", 10), request.form.get("focus", "mixed"),
+                                        True, request.form.get("job_description", ""))
+        except Exception as e:
+            return jsonify({"error": f"Generating questions failed: {e}"}), 400
     if not qs:
-        return jsonify({"error": "No questions found. Upload a file or paste questions."}), 400
-    resume = ""
-    if "resume_file" in request.files and request.files["resume_file"].filename:
-        resume = read_file_text(request.files["resume_file"])
-    resume = (resume + "\n" + (request.form.get("resume_text") or "")).strip()
+        return jsonify({"error": "No questions found. Upload a file, paste questions, or generate them from your resume."}), 400
     sid = slug(name, 60) + "_" + datetime.now().strftime("%m%d%H%M%S")
     s = {"id": sid, "name": name, "resume_text": resume, "job_description": request.form.get("job_description", ""),
          "items": [{"id": i + 1, "n": i + 1, "topic": q.get("category", ""), "high": False,
@@ -1107,7 +1323,8 @@ def shadow_generate(set_id, item_id):
     if not it:
         return jsonify({"error": "not found"}), 404
     st = load_settings()
-    user = (f"Candidate resume:\n{(s.get('resume_text') or '(no resume provided)')[:12000]}\n\n"
+    resume = active_resume_text(st) or s.get("resume_text") or "(no resume provided)"
+    user = (f"Candidate resume:\n{resume[:12000]}\n\n"
             f"Target role: {st.get('target_role')}\n"
             f"Job description: {(s.get('job_description') or st.get('job_description') or 'not provided')[:4000]}\n\n"
             f"Topic: {it.get('topic') or '-'}\nInterview question: {it['question']}")

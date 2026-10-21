@@ -48,6 +48,19 @@ provider in Settings):
 
 Without any speech-to-text you can still type your answers.
 
+## Resumes
+Open the **Resumes** tab to upload one or more resumes (PDF, Word or TXT, or paste the text). Each one is saved on
+your computer in the `resumes/` folder. Pick one and click **Make active**:
+- **Questions tab -> Generate from your resume** writes interview questions about your real projects and skills
+  (choose how many and the focus: mixed, project deep-dives, technical or behavioral), optionally with model answers.
+- Scoring, model answers and Learn lessons use your active resume, and never invent employers or metrics that
+  aren't in it.
+- **Shadow practice** answers are written from the active resume, and **+ New set** can generate a whole practice set
+  from it.
+
+Switch the active resume at any time, for example one per job type. Use **View text** to check what the AI reads;
+scanned-image PDFs can't be read, so upload a Word file or paste the text instead.
+
 ## Features
 - **Questions:** upload Excel / CSV / PDF / Word / TXT, or type them. Excel/CSV can have `Question`, `Answer`,
   `Category` columns (see `sample_questions.csv`). Tick "Use AI to extract" for messy PDFs/Word files. Save lists
@@ -69,8 +82,8 @@ Pick a question, choose an **American** or **Indian** accent, and press **Start 
 - **Speak along:** the voice plays the whole answer while you speak with it (wear headphones).
 - **Listen, then repeat:** hear one phrase, repeat it, get scored 0-100 on word accuracy, pace and hesitations.
 - At the end: summary, problem words, pronunciation tips, and **Say it from memory**.
-- A small sample set is included. Click **+ New set** to upload your own questions and resume (+ optional JD);
-  **Generate missing answers** writes first-person answers based only on your resume.
+- A small sample set is included. Click **+ New set** to upload your own questions, or tick **Generate questions and
+  answers from the resume**. **Generate missing answers** writes first-person answers from your active resume.
 
 ## Privacy and where data is saved
 All of this stays in the app folder on your computer and is excluded from git by `.gitignore`:
@@ -78,6 +91,7 @@ All of this stays in the app folder on your computer and is excluded from git by
 - `sessions/<date>_<name>/` - videos, audio, webcam frames, transcripts, evaluations, reports
 - `data/question_sets/`, `data/shadow_sets/`, `data/shadow_progress/` - your question lists and practice progress
 - `shadow_recordings/` - your Shadow practice recordings
+- `resumes/` - your uploaded resumes (original file + extracted text)
 
 Your answers, transcripts and webcam frames are sent to the AI provider you configure, under that provider's terms.
 The server only listens on `127.0.0.1`, so other devices on your network can't open it.

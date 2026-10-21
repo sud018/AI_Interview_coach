@@ -693,12 +693,15 @@
       fd.append("questions_text", $("#sh-new-qtext").value);
       if ($("#sh-new-resume").files[0]) fd.append("resume_file", $("#sh-new-resume").files[0]);
       fd.append("job_description", $("#sh-new-jd").value);
-      msg($("#sh-new-msg"), "Creating...");
+      const fromResume = $("#sh-new-fromresume").checked;
+      if (fromResume) { fd.append("from_resume", "1"); fd.append("count", $("#sh-new-count").value); fd.append("focus", $("#sh-new-focus").value); }
+      msg($("#sh-new-msg"), fromResume ? "Writing questions and answers from your resume... this can take a minute or two." : "Creating...");
       try {
         const r = await api("/api/shadow/sets", { method: "POST", body: fd });
         setPref("set", r.id); $("#sh-set").value = "";
         await loadSetList(); $("#sh-set").value = r.id; await loadSet(r.id);
-        msg($("#sh-new-msg"), "Created. Now click “Generate missing answers”.", "ok");
+        if (typeof loadResumes === "function") loadResumes();
+        msg($("#sh-new-msg"), fromResume ? "Created with answers from your resume." : "Created. Now click “Generate missing answers” (uses your active resume).", "ok");
       } catch (e) { msg($("#sh-new-msg"), e.message, "err"); }
     };
     $("#sh-set-delete").onclick = async () => {

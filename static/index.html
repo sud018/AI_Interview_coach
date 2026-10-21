@@ -12,6 +12,7 @@
   <h1>AI Interviewer</h1>
   <nav id="nav" class="hidden">
     <button data-view="questions">Questions</button>
+    <button data-view="resumes">Resumes</button>
     <button data-view="shadow">Shadow practice</button>
     <button data-view="history">History</button>
     <button data-view="settings">Settings</button>
@@ -49,6 +50,15 @@
     <div class="grid2">
       <div class="card">
         <h2>1. Add questions</h2>
+        <div class="rs-gen">
+          <div class="row between"><b>✨ Generate from your resume</b><span id="q-rs-active" class="hint"></span></div>
+          <div class="row">
+            <label class="hint" style="margin:0">How many <select id="q-rs-count"><option>5</option><option selected>10</option><option>15</option><option>20</option></select></label>
+            <label class="hint" style="margin:0">Focus <select id="q-rs-focus"><option value="mixed">Mixed</option><option value="projects">Project deep-dives</option><option value="technical">Technical</option><option value="behavioral">Behavioral</option></select></label>
+          </div>
+          <label class="inline"><input id="q-rs-answers" type="checkbox" checked> Also write model answers from my resume</label>
+          <div class="row"><button id="q-rs-gen" class="primary">Generate questions</button><span class="hint">Uses the job description below if you paste one.</span></div>
+        </div>
         <label>Upload Excel / CSV / PDF / Word / TXT
           <input id="q-file" type="file" accept=".xlsx,.xlsm,.csv,.pdf,.docx,.txt,.md">
         </label>
@@ -168,7 +178,13 @@
           <label>Set name <input id="sh-new-name" placeholder="e.g. Data Engineer - Bank"></label>
           <label>Questions file (PDF / Word / Excel / CSV / TXT) <input id="sh-new-qfile" type="file" accept=".pdf,.docx,.xlsx,.csv,.txt"></label>
           <label>Or paste questions <textarea id="sh-new-qtext" rows="3"></textarea></label>
-          <label>Your resume (PDF / Word / TXT) <input id="sh-new-resume" type="file" accept=".pdf,.docx,.txt,.md"></label>
+          <label>Resume (PDF / Word / TXT, optional) <input id="sh-new-resume" type="file" accept=".pdf,.docx,.txt,.md"></label>
+          <p class="hint">Leave empty to use your active resume (<b id="sh-active-resume">none</b>). A resume uploaded here is saved to the Resumes tab and becomes active.</p>
+          <label class="inline"><input id="sh-new-fromresume" type="checkbox"> Generate questions and answers from the resume</label>
+          <div class="row">
+            <label class="hint" style="margin:0">How many <select id="sh-new-count"><option>5</option><option selected>10</option><option>15</option><option>20</option></select></label>
+            <label class="hint" style="margin:0">Focus <select id="sh-new-focus"><option value="mixed">Mixed</option><option value="projects">Project deep-dives</option><option value="technical">Technical</option><option value="behavioral">Behavioral</option></select></label>
+          </div>
           <label>Job description (optional) <textarea id="sh-new-jd" rows="3"></textarea></label>
           <div class="row"><button id="sh-new-create" class="primary">Create set</button><button id="sh-set-delete" class="danger">Delete selected set</button></div>
           <span id="sh-new-msg" class="msg"></span>
@@ -225,7 +241,7 @@
           </div>
           <div class="row">
             <button id="sh-edit">✏ Edit answer</button>
-            <button id="sh-generate">✨ (Re)generate answer from resume</button>
+            <button id="sh-generate">✨ (Re)generate answer from active resume</button>
             <span class="hint" id="sh-meta"></span>
           </div>
           <div id="sh-editbox" class="hidden">
@@ -254,6 +270,31 @@
       <h2>Past interviews</h2>
       <p class="hint">Recordings, transcripts, evaluations and reports are saved in the <code>sessions</code> folder next to the app.</p>
       <div id="hist-list"></div>
+    </div>
+  </section>
+
+  <!-- ============ RESUMES ============ -->
+  <section id="view-resumes" class="view hidden">
+    <div class="grid2">
+      <div class="card">
+        <h2>Upload a resume</h2>
+        <p class="hint">Resumes are saved only on this computer, in the <code>resumes</code> folder. The <b>active</b> resume is used to generate questions and model answers, write Shadow practice answers, and tailor coaching.</p>
+        <label>Resume file (PDF / Word / TXT) <input id="rs-file" type="file" accept=".pdf,.docx,.txt,.md"></label>
+        <label>Or paste the resume text <textarea id="rs-text" rows="5"></textarea></label>
+        <label>Name <input id="rs-name" placeholder="e.g. Backend resume 2026 (defaults to the file name)"></label>
+        <label class="inline"><input id="rs-make-active" type="checkbox" checked> Make it the active resume</label>
+        <div class="row"><button id="rs-upload" class="primary">Save resume</button><span id="rs-msg" class="msg"></span></div>
+      </div>
+      <div class="card">
+        <h2>Your resumes</h2>
+        <div id="rs-list"></div>
+        <div class="row"><button id="rs-none">Don't use a resume</button></div>
+      </div>
+    </div>
+    <div id="rs-preview" class="card hidden">
+      <div class="row between"><h2 id="rs-preview-title" style="margin:0"></h2><button id="rs-preview-close">Close</button></div>
+      <p class="hint">This is the text the AI reads. If it looks garbled (for example a scanned PDF), upload a Word file or paste the text instead.</p>
+      <pre id="rs-preview-text" class="rs-text"></pre>
     </div>
   </section>
 

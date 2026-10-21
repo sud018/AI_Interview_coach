@@ -108,3 +108,14 @@ button.big-inline { font-size:16px; padding:10px 18px; }
 .sh-analysis:empty { display:none; }
 .sh-analysis { margin:-2px 0 10px; }
 .deliv { border:1px solid #cdd8f5; background:#f8faff; border-radius:8px; padding:12px 14px; }
+
+/* resumes */
+.rs-gen { background:#f7f9fc; border:1px solid var(--line); border-radius:8px; padding:10px 12px; margin-bottom:12px; }
+.rs-gen .row label select { width:auto; margin-left:4px; }
+.rs-item { border:1px solid var(--line); border-radius:8px; padding:10px 12px; margin-bottom:8px; display:flex; justify-content:space-between; gap:10px; flex-wrap:wrap; align-items:center; }
+.rs-item.active { border-color:var(--primary); background:#f5f8ff; }
+.rs-item .row { margin:0; }
+.btnlink { padding:8px 14px; border-radius:6px; border:1px solid #cdd2d9; background:#fff; color:inherit; text-decoration:none; font-size:15px; }
+.btnlink:hover { background:#f0f2f5; }
+.rs-text { white-space:pre-wrap; font-family:inherit; font-size:14px; line-height:1.5; max-height:480px; overflow:auto; background:#f7f9fc; padding:12px; border-radius:6px; margin:0; }
+.q-item .meta textarea { margin:0; }

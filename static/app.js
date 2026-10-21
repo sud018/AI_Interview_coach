@@ -75,6 +75,7 @@ function show(view) {
   if (view === "history") loadHistory();
   if (view === "settings") fillSettings();
   if (view === "questions") loadSets();
+  if (view === "questions" || view === "resumes" || view === "shadow") loadResumes();
   if (view === "shadow" && window.shadowInit) shadowInit();
   if (view !== "shadow" && window.shadowStop) shadowStop();
   if (view !== "interview") stopCamera();
@@ -245,7 +246,7 @@ function renderQuestions() {
         <textarea rows="2" data-f="question">${esc(q.question)}</textarea>
         <div class="meta">
           <input data-f="category" placeholder="Category (optional)" value="${esc(q.category)}" style="max-width:200px">
-          <input data-f="reference_answer" placeholder="Expected answer / notes (optional)" value="${esc(q.reference_answer)}">
+          <textarea data-f="reference_answer" rows="2" placeholder="Expected answer / notes (optional)">${esc(q.reference_answer)}</textarea>
         </div>
       </div>
       <div class="actions">
@@ -296,6 +297,84 @@ $("#q-add-text").onclick = async () => {
 };
 $("#q-add-one").onclick = () => { QUESTIONS.push({ question: "", reference_answer: "", category: "" }); saveLocal(); renderQuestions(); };
 $("#q-clear").onclick = () => { if (confirm("Clear all questions from the list?")) { QUESTIONS = []; saveLocal(); renderQuestions(); } };
+
+// ------------------------------------------------------------ resumes
+let RESUMES = { active: "", resumes: [] };
+const activeResume = () => RESUMES.resumes.find((r) => r.id === RESUMES.active);
+async function loadResumes() {
+  try { RESUMES = await api("/api/resumes"); } catch (e) { console.error(e); }
+  renderResumes(); renderActiveResume();
+}
+function renderActiveResume() {
+  const r = activeResume();
+  $("#q-rs-active").textContent = r ? `Active resume: ${r.name}` : "No active resume - add one in the Resumes tab";
+  const sh = document.querySelector("#sh-active-resume"); if (sh) sh.textContent = r ? r.name : "none";
+}
+function renderResumes() {
+  const list = $("#rs-list");
+  if (!RESUMES.resumes.length) { list.innerHTML = '<p class="hint">No resumes yet. Upload one on the left.</p>'; return; }
+  list.innerHTML = RESUMES.resumes.map((r) => {
+    const on = r.id === RESUMES.active;
+    return `<div class="rs-item${on ? " active" : ""}" data-id="${esc(r.id)}">
+      <div><b>${esc(r.name)}</b> ${on ? '<span class="pill">Active</span>' : ""}
+        <div class="hint">${esc(r.filename || "pasted text")} · ${esc((r.uploaded || "").replace("T", " "))} · ${r.chars} characters</div></div>
+      <div class="row">
+        ${on ? "" : '<button data-a="activate" class="primary">Make active</button>'}
+        <button data-a="view">View text</button>
+        ${r.filename ? `<a class="btnlink" href="/resumes/${encodeURIComponent(r.id)}/file">Download</a>` : ""}
+        <button data-a="del" class="danger">Delete</button>
+      </div></div>`;
+  }).join("");
+}
+$("#rs-list").addEventListener("click", async (e) => {
+  const a = e.target.dataset.a; if (!a) return;
+  const id = e.target.closest(".rs-item").dataset.id;
+  try {
+    if (a === "view") {
+      const r = await api(`/api/resumes/${encodeURIComponent(id)}/text`);
+      $("#rs-preview-title").textContent = r.name; $("#rs-preview-text").textContent = r.text;
+      $("#rs-preview").classList.remove("hidden"); $("#rs-preview").scrollIntoView({ behavior: "smooth" });
+      return;
+    }
+    if (a === "activate") RESUMES = await postJSON("/api/resumes/active", { id });
+    if (a === "del") {
+      if (!confirm("Delete this resume from this computer?")) return;
+      RESUMES = await api("/api/resumes/" + encodeURIComponent(id), { method: "DELETE" });
+      $("#rs-preview").classList.add("hidden");
+    }
+    renderResumes(); renderActiveResume();
+  } catch (err) { alert(err.message); }
+});
+$("#rs-preview-close").onclick = () => $("#rs-preview").classList.add("hidden");
+$("#rs-none").onclick = async () => { RESUMES = await postJSON("/api/resumes/active", { id: "" }); renderResumes(); renderActiveResume(); };
+$("#rs-upload").onclick = async () => {
+  const f = $("#rs-file").files[0], text = $("#rs-text").value.trim();
+  if (!f && !text) return msg($("#rs-msg"), "Choose a file or paste the resume text.", "err");
+  const fd = new FormData();
+  if (f) fd.append("file", f);
+  fd.append("text", text); fd.append("name", $("#rs-name").value.trim());
+  fd.append("make_active", $("#rs-make-active").checked ? "1" : "0");
+  msg($("#rs-msg"), "Reading resume...");
+  try {
+    RESUMES = await api("/api/resumes", { method: "POST", body: fd });
+    $("#rs-file").value = ""; $("#rs-text").value = ""; $("#rs-name").value = "";
+    msg($("#rs-msg"), "Saved.", "ok"); renderResumes(); renderActiveResume();
+  } catch (err) { msg($("#rs-msg"), err.message, "err"); }
+};
+$("#q-rs-gen").onclick = async () => {
+  const r0 = activeResume();
+  if (!r0) return msg($("#q-msg"), "No active resume. Upload one in the Resumes tab first.", "err");
+  const btn = $("#q-rs-gen"); btn.disabled = true;
+  msg($("#q-msg"), `Writing questions from "${r0.name}"... this can take up to a minute.`);
+  try {
+    const r = await postJSON("/api/resumes/questions", { count: +$("#q-rs-count").value, focus: $("#q-rs-focus").value,
+      with_answers: $("#q-rs-answers").checked, job_description: $("#iv-jd").value });
+    const n = addQuestions(r.questions);
+    msg($("#q-msg"), `Added ${n} questions from "${r0.name}". Review and edit them below.`, "ok");
+    if (!$("#set-name").value) $("#set-name").value = "From resume - " + r0.name;
+  } catch (err) { msg($("#q-msg"), err.message, "err"); }
+  btn.disabled = false;
+};
 
 async function loadSets() {
   const sets = await api("/api/question-sets");
