@@ -1,5 +1,5 @@
 """
-AI Interviewer - local app.
+AI Interview Coach - local app.
 Run:  python app.py   then open http://127.0.0.1:5000
 All data (settings, recordings, evaluations, reports) is stored next to this file.
 """
@@ -1636,5 +1636,5 @@ if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     if not os.environ.get("NO_BROWSER"):
         threading.Timer(1.2, lambda: webbrowser.open(f"http://127.0.0.1:{port}")).start()
-    print(f"\n  AI Interviewer running at http://127.0.0.1:{port}\n  Recordings are saved in: {SESSIONS_DIR}\n")
+    print(f"\n  AI Interview Coach running at http://127.0.0.1:{port}\n  Recordings are saved in: {SESSIONS_DIR}\n")
     app.run(host="127.0.0.1", port=port, debug=False, threaded=True)

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Start AI Interviewer on macOS / Linux.  Usage: ./run.sh
+# Start AI Interview Coach on macOS / Linux.  Usage: ./run.sh
 set -e
 cd "$(dirname "$0")"
 PY=$(command -v python3 || command -v python || true)
@@ -14,5 +14,5 @@ fi
 echo "Installing / checking requirements..."
 .venv/bin/python -m pip install -q --upgrade pip
 .venv/bin/python -m pip install -q -r requirements.txt
-echo "Starting AI Interviewer... (press Ctrl+C to stop)"
+echo "Starting AI Interview Coach... (press Ctrl+C to stop)"
 exec .venv/bin/python app.py

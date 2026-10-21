@@ -13,6 +13,6 @@ if not exist ".venv\Scripts\python.exe" (
 echo Installing / checking requirements...
 ".venv\Scripts\python.exe" -m pip install -q --upgrade pip
 ".venv\Scripts\python.exe" -m pip install -q -r requirements.txt
-echo Starting AI Interviewer... (close this window to stop)
+echo Starting AI Interview Coach... (close this window to stop)
 ".venv\Scripts\python.exe" app.py
 pause
